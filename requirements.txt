@@ -1,3 +1,8 @@
 fastapi
-uvicorn
-sqlalchemy
+uvicorn[standard]
+SQLAlchemy>=2.0
+pydantic>=2.4
+pydantic-settings>=2.2
+python-jose[cryptography]
+passlib[bcrypt]>=1.7.4
+pydantic[email]>=2.4
