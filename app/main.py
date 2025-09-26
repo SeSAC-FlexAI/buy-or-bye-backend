@@ -14,4 +14,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+init_db()  # ← 앱 시작 시 테이블 생성
+
 app.include_router(api_router, prefix="/api")
