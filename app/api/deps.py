@@ -1,10 +1,17 @@
 from typing import Generator
-from fastapi import Depends, HTTPException, status
+from fastapi import Security, HTTPException, status, Depends
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from app.db.base import SessionLocal
 from app.core.config import settings
 from app.repositories.user_repo import UserRepository
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.core.security import decode_token
+from app.db.init_db import get_db
+from app.models.user import User
+
+
+security = HTTPBearer(auto_error=True)
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -29,8 +36,22 @@ def get_current_user_id(token: str | None = None, authorization: str | None = No
     except (JWTError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-def get_current_user(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    user = UserRepository(db).get(user_id)
+def get_current_user(
+    creds: HTTPAuthorizationCredentials = Security(security),
+    db: Session = Depends(get_db),
+) -> User:
+    token = creds.credentials
+    try:
+        payload = decode_token(token)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing subject")
+
+    # subject를 user.id로 넣었다면 int 변환
+    user = db.query(User).filter(User.id == int(sub)).first()
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
