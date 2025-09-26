@@ -2,16 +2,17 @@ from typing import Generator
 from fastapi import Security, HTTPException, status, Depends
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
+
 from app.db.base import SessionLocal
 from app.core.config import settings
-from app.repositories.user_repo import UserRepository
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.security import decode_token
 from app.db.init_db import get_db
 from app.models.user import User
-
+from typing import Optional
 
 security = HTTPBearer(auto_error=True)
+security_optional = HTTPBearer(auto_error=False)
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -55,3 +56,18 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+def get_current_user_optional(
+    creds: Optional[HTTPAuthorizationCredentials] = Security(security_optional),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    if not creds:
+        return None
+    try:
+        payload = decode_token(creds.credentials)
+        sub = payload.get("sub")
+        if not sub:
+            return None
+        return db.query(User).filter(User.id == int(sub)).first()
+    except Exception:
+        return None
