@@ -1,9 +1,11 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-import os
-
-DB_URL = os.getenv("DATABASE_URL", "sqlite:///./project.db")
-connect_args = {"check_same_thread": False} if DB_URL.startswith("sqlite") else {}
-engine = create_engine(DB_URL, echo=False, future=True, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
+# app/db/base.py
+from sqlalchemy.orm import declarative_base
 Base = declarative_base()
+
+# ✅ 모델 매핑 등록용 임포트만
+from app.models.user import User            # noqa: F401
+from app.models.account import AccountBook  # noqa: F401
+from app.models.fpti import FPTI            # noqa: F401
+from app.models.fpa import FPA              # noqa: F401
+from app.models.fsd import FSDSetting       # noqa: F401
+from app.models.chatbot import ChatbotSetting, ChatbotMessage  # noqa: F401 
