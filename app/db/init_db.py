@@ -1,8 +1,14 @@
 # app/db/init_db.py
-from sqlalchemy.orm import Session, sessionmaker
-from app.db.base import Base, engine
-from app.models.user import User
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from app.db.base import Base  
 from app.core.security import get_password_hash
+from app.models.user import User
+
+DB_URL = os.getenv("DATABASE_URL", "sqlite:///./project.db")
+connect_args = {"check_same_thread": False} if DB_URL.startswith("sqlite") else {}
+engine = create_engine(DB_URL, echo=False, future=True, connect_args=connect_args)
 
 # 1) 의존성으로 사용할 세션 팩토리
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
