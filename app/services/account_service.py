@@ -51,3 +51,6 @@ def update(db: Session, user_id: int, account_id: int, payload: AccountUpdate) -
         method=payload.method,
     )
     return get_form(db, user_id, row.id)
+
+def delete(db: Session, user_id: int, account_id: int) -> bool:
+    return account_repo.delete_by_id(db, user_id, account_id)

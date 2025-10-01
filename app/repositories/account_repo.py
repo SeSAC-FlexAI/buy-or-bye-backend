@@ -68,3 +68,16 @@ def update_account(
     db.commit()
     db.refresh(row)
     return row
+
+#삭제 
+def delete_by_id(db: Session, user_id: int, account_id: int) -> bool:
+    row = (
+        db.query(AccountBook)
+        .filter(AccountBook.id == account_id, AccountBook.user_id == user_id)
+        .first()
+    )
+    if not row:
+        return False
+    db.delete(row)
+    db.commit()
+    return True

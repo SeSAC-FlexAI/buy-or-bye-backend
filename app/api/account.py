@@ -56,3 +56,14 @@ def update_account(
     if not res:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return res
+
+@router.delete("/{account_id}", status_code=status.HTTP_200_OK)
+def delete_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    ok = account_service.delete(db, user.id, account_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return {"success": True}
