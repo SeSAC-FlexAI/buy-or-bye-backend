@@ -1,26 +1,53 @@
-# app/services/account_service.py
+from typing import Optional
 from sqlalchemy.orm import Session
 from app.repositories import account_repo
-from app.schemas.account import AccountCreate, AccountUpdate
+from app.schemas.account import AccountFormOut, AccountUpdate, IoType
+from app.common.account_constants import INCOME_CATEGORIES, EXPENSE_CATEGORIES
 
-def create_account(db: Session, user_id: int, payload: AccountCreate):
-    return account_repo.create_account(db, user_id, payload)
+def _io_type_from_amount(amount_signed: float) -> IoType:
+    return "income" if amount_signed >= 0 else "expense"
 
-def get_accounts(db: Session, user_id: int):
-    return account_repo.get_accounts(db, user_id)
-
-def get_account_by_id(db: Session, account_id: int):
-    return account_repo.get_account_by_id(db, account_id)
-
-def update_account(db: Session, account_id: int, data: AccountUpdate):
-    account = account_repo.get_account_by_id(db, account_id)
-    if not account:
+def get_form(db: Session, user_id: int, account_id: int) -> Optional[AccountFormOut]:
+    row = account_repo.get_by_id(db, user_id, account_id)
+    if not row:
         return None
-    return account_repo.update_account(db, account, data)
+    io_type = _io_type_from_amount(row.amount)
+    return AccountFormOut(
+        id=row.id,
+        io_type=io_type,
+        amount=abs(float(row.amount)),
+        category=row.category,
+        date=row.date,
+        description=row.description,
+        method=row.method,
+    )
 
-def delete_account(db: Session, account_id: int):
-    account = account_repo.get_account_by_id(db, account_id)
-    if not account:
+def update(db: Session, user_id: int, account_id: int, payload: AccountUpdate) -> Optional[AccountFormOut]:
+    row = account_repo.get_by_id(db, user_id, account_id)
+    if not row:
         return None
-    account_repo.delete_account(db, account)
-    return True
+
+    current_io = _io_type_from_amount(row.amount)
+    io_type = payload.io_type or current_io
+
+    # 카테고리 검증(validator 보완)
+    if payload.category:
+        if io_type == "income" and payload.category not in INCOME_CATEGORIES:
+            raise ValueError("수입 카테고리 허용값이 아닙니다.")
+        if io_type == "expense" and payload.category not in EXPENSE_CATEGORIES:
+            raise ValueError("지출 카테고리 허용값이 아닙니다.")
+
+    amount_signed = None
+    if payload.amount is not None:
+        amount_signed = payload.amount if io_type == "income" else -payload.amount
+
+    row = account_repo.update_account(
+        db,
+        row,
+        amount_signed=amount_signed,
+        category=payload.category,
+        date=payload.date,
+        description=payload.description,
+        method=payload.method,
+    )
+    return get_form(db, user_id, row.id)
