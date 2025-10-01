@@ -24,14 +24,12 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
-    # ✅ AccountBook과 1:N (이 이름이 아래 AccountBook의 back_populates와 반드시 일치)
-    account_books = relationship(
-        "AccountBook",
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
+    assets = relationship("Asset", back_populates="user", cascade="all, delete-orphan")
+    expense = relationship("Expense", back_populates="user", cascade="all, delete-orphan")
+    income = relationship("Income", back_populates="user", cascade="all, delete-orphan")
 
     fpti_list = relationship("FPTI", back_populates="user", cascade="all, delete-orphan")
     fpa_list = relationship("FPA", back_populates="user", cascade="all, delete-orphan")
     fsd_setting = relationship("FSDSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")
     pattern_setting = relationship("PatternSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
