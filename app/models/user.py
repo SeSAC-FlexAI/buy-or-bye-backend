@@ -24,6 +24,7 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    assets = relationship("Asset", back_populates="user", cascade="all, delete-orphan")
     fpti_list = relationship("FPTI", back_populates="user", cascade="all, delete-orphan")
     fpa_list = relationship("FPA", back_populates="user", cascade="all, delete-orphan")
     fsd_setting = relationship("FSDSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")
