@@ -1,27 +1,70 @@
+from typing import Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy import func, literal
 from app.models.account import AccountBook
-from app.schemas.account import AccountCreate, AccountUpdate
+from app.schemas.account import AccountCreate
+from app.common.account_constants import LOAN_CATEGORY
 
-def create_account(db: Session, user_id: int, data: AccountCreate):
-    account = AccountBook(user_id=user_id, **data.dict())
-    db.add(account)
+# 생성: 수입=+, 지출=-
+def create_account(db: Session, user_id: int, payload: AccountCreate) -> AccountBook:
+    signed_amount = payload.amount if payload.io_type == "income" else -payload.amount
+    row = AccountBook(
+        user_id=user_id,
+        date=payload.date,
+        category=payload.category,
+        description=payload.description,
+        amount=signed_amount,
+        method=payload.method,
+    )
+    db.add(row)
     db.commit()
-    db.refresh(account)
-    return account
+    db.refresh(row)
+    return row
 
-def get_accounts(db: Session, user_id: int):
-    return db.query(AccountBook).filter(AccountBook.user_id == user_id).all()
+# 월 목록 (대출 제외)
+def list_month(db: Session, user_id: int, year: int, month: int) -> List[AccountBook]:
+    return (
+        db.query(AccountBook)
+        .filter(
+            AccountBook.user_id == user_id,
+            func.strftime('%Y', AccountBook.date) == literal(f"{year:04d}"),
+            func.strftime('%m', AccountBook.date) == literal(f"{month:02d}"),
+            AccountBook.category != LOAN_CATEGORY,
+        )
+        .order_by(AccountBook.date.asc(), AccountBook.id.asc())
+        .all()
+    )
 
-def get_account_by_id(db: Session, account_id: int):
-    return db.query(AccountBook).filter(AccountBook.id == account_id).first()
+# 단건 조회 (소유권 체크)
+def get_by_id(db: Session, user_id: int, account_id: int) -> Optional[AccountBook]:
+    return (
+        db.query(AccountBook)
+        .filter(AccountBook.id == account_id, AccountBook.user_id == user_id)
+        .first()
+    )
 
-def update_account(db: Session, account: AccountBook, data: AccountUpdate):
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(account, key, value)
+# 수정 (부분 업데이트)
+def update_account(
+    db: Session,
+    row: AccountBook,
+    *,
+    amount_signed: Optional[float] = None,
+    category: Optional[str] = None,
+    date=None,
+    description: Optional[str] = None,
+    method: Optional[str] = None,
+) -> AccountBook:
+    if amount_signed is not None:
+        row.amount = amount_signed
+    if category is not None:
+        row.category = category
+    if date is not None:
+        row.date = date
+    if description is not None:
+        row.description = description
+    if method is not None:
+        row.method = method
+    db.add(row)
     db.commit()
-    db.refresh(account)
-    return account
-
-def delete_account(db: Session, account: AccountBook):
-    db.delete(account)
-    db.commit()
+    db.refresh(row)
+    return row

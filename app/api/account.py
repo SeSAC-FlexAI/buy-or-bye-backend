@@ -1,45 +1,58 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.init_db import get_db
-from app.schemas.account import AccountCreate, AccountUpdate, AccountOut
+from app.api.deps import get_current_user
+from app.schemas.account import AccountCreate, AccountOut, AccountFormOut, AccountUpdate
+from app.repositories import account_repo
 from app.services import account_service
-from app.api.deps import get_current_user  # 로그인 필요시
 
-router = APIRouter()
+router = APIRouter(tags=["account"])
 
-@router.post("/", response_model=AccountOut)
+# 생성
+@router.post("", response_model=AccountOut)
 def create_account(
     payload: AccountCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),  # ✅ 쿼리 파라미터 대신 Depends
+    user = Depends(get_current_user),
 ):
-    return account_service.create_account(db, current_user.id, payload)
+    row = account_repo.create_account(db, user.id, payload)
+    return row
 
-@router.get("/", response_model=List[AccountOut])
-def read_accounts(
+# 월 목록(달력/일별 리스트)
+@router.get("/month", response_model=List[AccountOut])
+def list_month(
+    year: int = Query(..., ge=1900, le=2100),
+    month: int = Query(..., ge=1, le=12),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user = Depends(get_current_user),
 ):
-    return account_service.get_accounts(db, user.id)
+    return account_repo.list_month(db, user.id, year, month)
 
-@router.get("/{account_id}", response_model=AccountOut)
-def read_account(account_id: int, db: Session = Depends(get_db)):
-    account = account_service.get_account_by_id(db, account_id)
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return account
+# 편집 폼 조회 (연필 아이콘 클릭 시)
+@router.get("/{account_id}", response_model=AccountFormOut)
+def get_account_for_edit(
+    account_id: int,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    res = account_service.get_form(db, user.id, account_id)
+    if not res:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return res
 
-@router.put("/{account_id}", response_model=AccountOut)
-def update_account(account_id: int, data: AccountUpdate, db: Session = Depends(get_db)):
-    updated = account_service.update_account(db, account_id, data)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return updated
-
-@router.delete("/{account_id}")
-def delete_account(account_id: int, db: Session = Depends(get_db)):
-    ok = account_service.delete_account(db, account_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return {"detail": "Account deleted successfully"}
+# 수정 저장
+@router.put("/{account_id}", response_model=AccountFormOut)
+def update_account(
+    account_id: int,
+    payload: AccountUpdate,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    try:
+        res = account_service.update(db, user.id, account_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    if not res:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return res
