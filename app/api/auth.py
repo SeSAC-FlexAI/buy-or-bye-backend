@@ -16,3 +16,4 @@ def login(email: str, password: str, db: Session = Depends(get_db)):
 
     token = create_access_token(subject=str(user.id), expires_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {"access_token": token, "token_type": "bearer"}
+
