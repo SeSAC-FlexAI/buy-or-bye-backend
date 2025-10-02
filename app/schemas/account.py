@@ -12,7 +12,8 @@ class AccountCreate(BaseModel):
     category: str
     date: Date
     description: Optional[str] = None
-    method: Optional[str] = None
+    method: Optional[str] = Field(None, description="결제수단 (예: '카드' / '현금')")
+
 
     @field_validator("category")
     @classmethod
