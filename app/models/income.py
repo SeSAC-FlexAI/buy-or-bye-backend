@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Income(Base):
-    __tablename__ = "incomes"
+    __tablename__ = "income"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

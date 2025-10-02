@@ -1,8 +1,37 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+import openai
 from app.models.user import User
 from app.repositories import chatbot_repo
 from app.schemas.chatbot import ChatbotRequestIn, ChatbotSettingIn, ChatbotSettingOut, ChatbotResponseOut
+from app.core.config import settings  
+
+client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+async def _get_openai_response(question: str, system_prompt: Optional[str], temperature: Optional[float], top_p: Optional[float]) -> str:
+    # 프론트엔드 코드와 유사하게 시스템 프롬프트 설정
+    # 설정값이 없으면 기본 프롬프트를 사용합니다.
+    final_system_prompt = system_prompt or settings.DEFAULT_FINANCE_PROMPT
+    
+    messages = [
+        {"role": "system", "content": final_system_prompt},
+        {"role": "user", "content": question}
+    ]
+
+    try:
+        # OpenAI API 호출
+        completion = await client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=1500,
+            # 사용자 설정값 우선, 없으면 기본값 사용
+            temperature=temperature if temperature is not None else 0.7,
+            top_p=top_p if top_p is not None else 1.0,
+        )
+        return completion.choices[0].message.content or "죄송합니다, 응답을 생성할 수 없습니다."
+    except Exception as e:
+        print(f"OpenAI API error: {e}")
+        return "죄송합니다, 현재 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해주세요."
 
 def _mock_answer(question: str, system_prompt: Optional[str], temperature: Optional[float], top_p: Optional[float]) -> str:
     # 간단한 목업: 설정값을 반영해 텍스트 생성 흉내
@@ -12,11 +41,11 @@ def _mock_answer(question: str, system_prompt: Optional[str], temperature: Optio
     if top_p is not None:       tail += f"(top_p={top_p})"
     return f"{prefix}질문 요약: {question[:120]} ...\n\n이건 목업 응답입니다. {tail}".strip()
 
-def ask(db: Session, current_user: Optional[User], payload: ChatbotRequestIn) -> ChatbotResponseOut:
+async def ask(db: Session, current_user: Optional[User], payload: ChatbotRequestIn) -> ChatbotResponseOut:
     uid = current_user.id if current_user else None
     setting = chatbot_repo.get_setting(db, uid) if uid else None
 
-    ans = _mock_answer(
+    ans = await _get_openai_response(
         payload.question,
         setting.system_prompt if setting else None,
         setting.temperature if setting else None,

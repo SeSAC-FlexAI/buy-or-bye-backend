@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Expense(Base):
-    __tablename__ = "expenses"
+    __tablename__ = "expense"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -15,7 +15,7 @@ class Expense(Base):
     transportation = Column(Integer, default=0)
     housing_maintenance = Column(Integer, default=0)
     culture_leisure = Column(Integer, default=0)
-    cosmetics = Column(Integer, default=0)
+    household_goods = Column(Integer, default=0)
     other = Column(Integer, default=0)
 
     user = relationship("User", back_populates="expense")

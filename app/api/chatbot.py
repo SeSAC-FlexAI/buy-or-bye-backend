@@ -9,12 +9,12 @@ from app.services import chatbot_service
 router = APIRouter(tags=["chatbot"])
 
 @router.post("/request", response_model=ChatbotResponseOut)
-def chatbot_request(
+async def chatbot_request(
     payload: ChatbotRequestIn,
     db: Session = Depends(get_db),
     user = Depends(get_current_user_optional),  # 게스트 허용
 ):
-    return chatbot_service.ask(db, user, payload)
+    return await chatbot_service.ask(db, user, payload)
 
 @router.get("/response/{message_id}", response_model=ChatbotResponseOut)
 def chatbot_response(

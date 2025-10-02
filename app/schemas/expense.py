@@ -10,7 +10,7 @@ class ExpenseBase(BaseModel):
     transportation: int | None = 0
     housing_maintenance: int | None = 0
     culture_leisure: int | None = 0
-    cosmetics: int | None = 0
+    household_goods: int | None = 0
     other: int | None = 0
 
 class ExpenseCreate(ExpenseBase):
@@ -23,7 +23,7 @@ class ExpenseUpdate(BaseModel):
     transportation: Optional[int] = None
     housing_maintenance: Optional[int] = None
     culture_leisure: Optional[int] = None
-    cosmetics: Optional[int] = None
+    household_goods: Optional[int] = None
     other: Optional[int] = None
 
 class ExpenseOut(ExpenseBase):
