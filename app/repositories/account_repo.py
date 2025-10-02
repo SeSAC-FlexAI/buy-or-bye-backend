@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, literal
 from app.models.account import AccountBook
 from app.schemas.account import AccountCreate
-from app.common.account_constants import LOAN_CATEGORY
 
 # 생성: 수입=+, 지출=-
 def create_account(db: Session, user_id: int, payload: AccountCreate) -> AccountBook:
@@ -29,7 +28,6 @@ def list_month(db: Session, user_id: int, year: int, month: int) -> List[Account
             AccountBook.user_id == user_id,
             func.strftime('%Y', AccountBook.date) == literal(f"{year:04d}"),
             func.strftime('%m', AccountBook.date) == literal(f"{month:02d}"),
-            AccountBook.category != LOAN_CATEGORY,
         )
         .order_by(AccountBook.date.asc(), AccountBook.id.asc())
         .all()
