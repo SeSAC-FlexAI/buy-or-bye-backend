@@ -1,16 +1,18 @@
 from fastapi import APIRouter
-from . import user, auth, account, asset, expense, income, fpti, fpa, fsd, pattern, chatbot, error_report
+from . import user, auth, account, asset, expense, income, fpti, fpa, fsd, pattern, chatbot, error_report, goal
 
 api_router = APIRouter()
 api_router.include_router(user.router, prefix="/user", tags=["users"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(account.router, prefix="/account", tags=["account"])
-api_router.include_router(asset.router, prefix="/assets", tags=["Assets"])
-api_router.include_router(expense.router, prefix="/expense", tags=["Expense"])
-api_router.include_router(income.router, prefix="/income", tags=["Income"])
+api_router.include_router(asset.router, prefix="/assets", tags=["assets"])
+api_router.include_router(expense.router, prefix="/expense", tags=["expense"])
+api_router.include_router(income.router, prefix="/income", tags=["income"])
 api_router.include_router(fpti.router,    prefix="/fpti",    tags=["fpti"])
-api_router.include_router(fpa.router,     prefix="/fpa",     tags=["fpa"])
-api_router.include_router(fsd.router,     prefix="/fsd",     tags=["fsd"])
-api_router.include_router(pattern.router, prefix="/pattern", tags=["pattern"])
+# api_router.include_router(fpa.router,     prefix="/fpa",     tags=["fpa"])
+# api_router.include_router(fsd.router,     prefix="/fsd",     tags=["fsd"])
+# api_router.include_router(pattern.router, prefix="/pattern", tags=["pattern"])
+api_router.include_router(goal.router, prefix="/goal", tags=["goal"])
+
 api_router.include_router(chatbot.router, prefix="/chatbot", tags=["chatbot"])
 api_router.include_router(error_report.router, prefix="/error-report", tags=["error-report"])

@@ -37,3 +37,4 @@ class User(Base):
     fpa_list = relationship("FPA", back_populates="user", cascade="all, delete-orphan")
     fsd_setting = relationship("FSDSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")
     pattern_setting = relationship("PatternSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    goals = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
