@@ -50,7 +50,7 @@ def calc_posting_delta(*, io_type: str, category: str, method: str | None, amoun
 
     if io_type == "expense":
         d.expense_delta      += amt
-        if mtd != "CARD":                 # 카드 지출은 자산 즉시 감소 없음
+        if mtd != "카드":                 # 카드 지출은 자산 즉시 감소 없음
             d.deposits_cash_delta -= amt
         return d
 

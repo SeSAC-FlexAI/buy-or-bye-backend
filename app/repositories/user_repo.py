@@ -1,6 +1,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.user import User
+from fastapi import HTTPException, status
 
 class UserRepository:
     def __init__(self, db: Session):
@@ -34,3 +35,10 @@ class UserRepository:
         self.db.commit()
         self.db.refresh(user)
         return user
+    
+    def hard_delete_by_id(self, user_id: int) -> None:
+        user = self.get(user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        self.db.delete(user)      # ★ 자식은 CASCADE로 자동 삭제
+        self.db.commit()

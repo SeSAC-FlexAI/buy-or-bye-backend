@@ -7,6 +7,7 @@ from app.services.user_service import register_user
 from app.repositories.user_repo import UserRepository
 from app.schemas.user_extra import UserEmailOut, PasswordChangeIn, EmailCheckOut
 from app.services import user_service
+from app.models.user import User
 
 router = APIRouter()
 
@@ -52,3 +53,28 @@ def check_email(
     # 인증 불필요 – 회원가입 전 중복 체크 용도
     email_norm = email.strip().lower()
     return user_service.check_email_available(db, email_norm)
+
+@router.delete("/me", summary="Hard delete my account")
+def delete_my_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user_service.delete_me(db, current_user)
+    return {"success": True}
+
+# --- 관리자용 (권한 체크 로직은 프로젝트 기준으로 적용) ---
+from fastapi import Path, HTTPException, status
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if getattr(user, "is_admin", False) or user.email == "admin@example.com":
+        return user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only")
+
+@router.delete("/{user_id}", summary="Hard delete a user (admin)")
+def admin_delete_user(
+    user_id: int = Path(..., description="삭제할 사용자 ID"),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    user_service.admin_delete_user(db, user_id)
+    return {"success": True}
