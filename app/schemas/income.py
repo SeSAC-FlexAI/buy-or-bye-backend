@@ -1,3 +1,4 @@
+# app/schemas/income.py (선택 사항)
 from pydantic import BaseModel, ConfigDict
 from datetime import date
 from typing import Optional
@@ -13,6 +14,7 @@ class IncomeCreate(IncomeBase):
     pass
 
 class IncomeUpdate(BaseModel):
+    date: Optional[date] = None           # ✅ (선택) 부분 업데이트 허용
     total_income: Optional[int] = None
     salary: Optional[int] = None
     investment_income: Optional[int] = None
@@ -21,4 +23,4 @@ class IncomeUpdate(BaseModel):
 class IncomeOut(IncomeBase):
     id: int
     user_id: int
-    model_config = ConfigDict(from_attributes=True)  # <= v2 방식
+    model_config = ConfigDict(from_attributes=True)

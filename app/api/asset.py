@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+# app/api/asset.py
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.init_db import get_db
@@ -8,38 +9,36 @@ from app.api.deps import get_current_user
 
 router = APIRouter()
 
-@router.post("/", response_model=AssetOut)
-def create_asset(
-    payload: AssetCreate,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
-):
-    return asset_service.create_asset(db, current_user.id, payload)
-
-@router.get("/", response_model=List[AssetOut])
-def read_assets(
+# ---------- /me (대시보드 단건) ----------
+@router.get("/me", response_model=AssetOut | None)
+def read_my_asset(
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
 ):
-    return asset_service.get_assets(db, user.id)
+    return asset_service.get_my_asset(db, user.id)
 
-@router.get("/{asset_id}", response_model=AssetOut)
-def read_asset(asset_id: int, db: Session = Depends(get_db)):
-    account = asset_service.get_asset_by_id(db, asset_id)
-    if not account:
-        raise HTTPException(status_code=404, detail="asset not found")
-    return account
+@router.post("/me", response_model=AssetOut, status_code=status.HTTP_201_CREATED)
+def create_or_replace_my_asset(
+    payload: AssetCreate,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    return asset_service.upsert_my_asset(db, user.id, payload)
 
-@router.put("/{asset_id}", response_model=AssetOut)
-def update_asset(asset_id: int, data: AssetUpdate, db: Session = Depends(get_db)):
-    updated = asset_service.update_asset(db, asset_id, data)
-    if not updated:
-        raise HTTPException(status_code=404, detail="asset not found")
-    return updated
+@router.put("/me", response_model=AssetOut)
+def update_my_asset(
+    payload: AssetUpdate,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    return asset_service.upsert_my_asset(db, user.id, payload)
 
-@router.delete("/{asset_id}")
-def delete_asset(asset_id: int, db: Session = Depends(get_db)):
-    ok = asset_service.delete_asset(db, asset_id)
+@router.delete("/me", status_code=status.HTTP_200_OK)
+def delete_my_asset(
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    ok = asset_service.delete_my_asset(db, user.id)
     if not ok:
         raise HTTPException(status_code=404, detail="asset not found")
-    return {"detail": "Asset deleted successfully"}
+    return {"success": True}
