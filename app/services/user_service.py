@@ -4,6 +4,7 @@ from app.core.security import get_password_hash, verify_password, create_access_
 from app.repositories.user_repo import UserRepository
 from app.schemas.user import UserCreate
 from app.schemas.user_extra import UserEmailOut, PasswordChangeIn, EmailCheckOut
+from app.models.user import User
 
 def register_user(db: Session, payload: UserCreate):
     repo = UserRepository(db)
@@ -51,3 +52,9 @@ def change_password(db: Session, user_id: int, payload: PasswordChangeIn) -> boo
     new_hashed = get_password_hash(payload.new_password)
     updated = repo.update_password(user_id, new_hashed)
     return updated is not None
+
+def delete_me(db: Session, current_user: User) -> None:
+    UserRepository(db).hard_delete_by_id(current_user.id)
+
+def admin_delete_user(db: Session, target_user_id: int) -> None:
+    UserRepository(db).hard_delete_by_id(target_user_id)

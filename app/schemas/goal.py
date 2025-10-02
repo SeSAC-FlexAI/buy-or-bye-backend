@@ -1,5 +1,4 @@
-# app/schemas/goal.py
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, Field
 from typing import Optional, Literal
 from datetime import date
 
@@ -7,12 +6,12 @@ GoalType = Literal["ASSET", "INCOME", "EXPENSE"]
 Period = Literal["MONTHLY", "YEARLY"]
 
 class GoalBase(BaseModel):
-    goal_type: GoalType
-    period: Period
-    year: int
-    month: Optional[int] = None
-    category: Optional[str] = None
-    target_amount: int
+    goal_type: GoalType = Field(..., description="목표 유형 (ASSET/INCOME/EXPENSE)")
+    period: Period = Field(..., description="집계 주기 (MONTHLY/YEARLY)")
+    year: int = Field(..., description="대상 연도")
+    month: Optional[int] = Field(None, description="대상 월 (MONTHLY일 때 1~12)")
+    category: Optional[str] = Field(None, description="세부 카테고리(선택)")
+    target_amount: int = Field(..., description="목표 금액")
 
     @field_validator("month")
     @classmethod
@@ -26,20 +25,53 @@ class GoalBase(BaseModel):
                 raise ValueError("month must be None for YEARLY goals")
         return v
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "goal_type": "EXPENSE",
+                "period": "MONTHLY",
+                "year": 2025,
+                "month": 10,
+                "category": "식비",
+                "target_amount": 300000
+            }
+        }
+    )
+
 class GoalCreate(GoalBase):
     pass
 
 class GoalUpdate(BaseModel):
-    # 키(범위)를 고정하고 금액만 수정하는 용도라면 target_amount만 Optional로 받아도 됨
-    # 확장성을 위해 동일 필드 지원 (exclude_unset로 부분 업데이트)
-    goal_type: Optional[GoalType] = None
-    period: Optional[Period] = None
-    year: Optional[int] = None
-    month: Optional[int] = None
-    category: Optional[str] = None
-    target_amount: Optional[int] = None
+    goal_type: Optional[GoalType] = Field(None, description="목표 유형")
+    period: Optional[Period] = Field(None, description="집계 주기")
+    year: Optional[int] = Field(None, description="연도")
+    month: Optional[int] = Field(None, description="월 (MONTHLY면 1~12)")
+    category: Optional[str] = Field(None, description="카테고리")
+    target_amount: Optional[int] = Field(None, description="목표 금액")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "target_amount": 280000
+            }
+        }
+    )
 
 class GoalOut(GoalBase):
     id: int
     user_id: int
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": 7,
+                "user_id": 1,
+                "goal_type": "EXPENSE",
+                "period": "MONTHLY",
+                "year": 2025,
+                "month": 10,
+                "category": "식비",
+                "target_amount": 300000
+            }
+        }
+    )
