@@ -3,24 +3,11 @@ from sqlalchemy.orm import Session
 from app.repositories import income_repo 
 from app.schemas.income import IncomeCreate, IncomeUpdate
 
-def create_income(db: Session, user_id: int, income: IncomeCreate):
-    return income_repo.create_income(db, user_id, income)
+def get_my_income(db: Session, user_id: int):
+    return income_repo.get_by_user_id(db, user_id)
 
-def get_income(db: Session, user_id: int):
-    return income_repo.get_income(db, user_id)
+def upsert_my_income(db: Session, user_id: int, payload: IncomeCreate | IncomeUpdate):
+    return income_repo.upsert_for_user(db, user_id, payload)
 
-def get_income_by_id(db: Session, income_id: int):
-    return income_repo.get_income_by_id(db, income_id)
-
-def update_income(db: Session, income_id: int, data: IncomeUpdate):
-    income = income_repo.get_income_by_id(db, income_id)
-    if not income:
-        return None
-    return income_repo.update_income(db, income, data)
-
-def delete_income(db: Session, income_id: int):
-    income = income_repo.get_income_by_id(db, income_id)
-    if not income:
-        return None
-    income_repo.delete_income(db, income)
-    return True
+def delete_my_income(db: Session, user_id: int) -> bool:
+    return income_repo.delete_by_user(db, user_id)

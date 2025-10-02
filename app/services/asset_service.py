@@ -3,24 +3,22 @@ from sqlalchemy.orm import Session
 from app.repositories import asset_repo
 from app.schemas.asset import AssetCreate, AssetUpdate
 
-def create_asset(db: Session, user_id: int, asset: AssetCreate):
-    return asset_repo.create_asset(db, user_id, asset)
+# ----- /me용 -----
+def get_my_asset(db: Session, user_id: int):
+    return asset_repo.get_by_user_id(db, user_id)
 
-def get_assets(db: Session, user_id: int):
-    return asset_repo.get_asset(db, user_id)
+def upsert_my_asset(db: Session, user_id: int, payload: AssetCreate | AssetUpdate):
+    return asset_repo.upsert_for_user(db, user_id, payload)
 
-def get_asset_by_id(db: Session, asset_id: int):
-    return asset_repo.get_asset_by_id(db, asset_id)
+def delete_my_asset(db: Session, user_id: int) -> bool:
+    return asset_repo.delete_by_user(db, user_id)
 
-def update_asset(db: Session, asset_id: int, data: AssetUpdate):
-    asset = asset_repo.get_asset_by_id(db, asset_id)
-    if not asset:
-        return None
-    return asset_repo.update_asset(db, asset, data)
+# # ----- (선택) 기존 id 기반을 계속 노출한다면: 소유권 보강 -----
+# def get_asset_by_id(db: Session, user_id: int, asset_id: int):
+#     return asset_repo.get_asset_by_id_for_user(db, user_id, asset_id)
 
-def delete_asset(db: Session, asset_id: int):
-    asset = asset_repo.get_asset_by_id(db, asset_id)
-    if not asset:
-        return None
-    asset_repo.delete_asset(db, asset)
-    return True
+# def update_asset(db: Session, user_id: int, asset_id: int, data: AssetUpdate):
+#     return asset_repo.update_asset_by_id_for_user(db, user_id, asset_id, data)
+
+# def delete_asset(db: Session, user_id: int, asset_id: int) -> bool:
+#     return asset_repo.delete_asset_by_id_for_user(db, user_id, asset_id)
