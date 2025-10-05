@@ -11,4 +11,7 @@ from app.models.income import Income        # noqa: F401
 from app.models.fpti import FPTI            # noqa: F401
 from app.models.fpa import FPA              # noqa: F401
 from app.models.fsd import FSDSetting       # noqa: F401
+from app.models.goal import Goal
 from app.models.chatbot import ChatbotSetting, ChatbotMessage  # noqa: F401 
+from app.models.error_report import ErrorReport
+from app.models.pattern import PatternSetting

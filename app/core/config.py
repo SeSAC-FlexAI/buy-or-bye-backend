@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "change-me"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    OPENAI_API_KEY: str = "key-is-not-set-in-env-file"
+    OPENAI_API_KEY: str
 
     DEFAULT_FINANCE_PROMPT: str = """너는 재무 분석가 'Dr. 파이낸스'야.
         나의 재무 상태를 점검하고 개선하고 싶어. 아래 키워드들을 중심으로 나의 재무 관리 방향성에 대해 조언해 줘.
