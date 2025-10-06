@@ -4,7 +4,7 @@ from typing import List
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./project.db"
-    CORS_ORIGINS: List[str] = ["http://localhost:8000", "https://buyorbye.co.kr"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "https://buyorbye.co.kr"]
     JWT_SECRET_KEY: str = "change-me"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
