@@ -1,67 +1,93 @@
-# app/repositories/goal_repo.py
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from typing import Optional, List
+from sqlalchemy import select
 from app.models.goal import Goal
 from app.schemas.goal import GoalCreate, GoalUpdate
 
-def get_one(
-    db: Session, user_id: int, goal_type: str, period: str, year: int,
-    month: Optional[int], category: Optional[str]
-) -> Optional[Goal]:
-    q = db.query(Goal).filter(
-        Goal.user_id == user_id,
-        Goal.goal_type == goal_type,
-        Goal.period == period,
-        Goal.year == year,
-        Goal.month.is_(month) if month is None else Goal.month == month,
-        Goal.category.is_(category) if category is None else Goal.category == category,
-    )
-    return q.first()
+class GoalRepository:
+    def __init__(self, db: Session):
+        self.db = db
 
-def list_goals(
-    db: Session, user_id: int,
-    goal_type: Optional[str] = None, period: Optional[str] = None,
-    year: Optional[int] = None, month: Optional[int] = None, category: Optional[str] = None
-) -> List[Goal]:
-    q = db.query(Goal).filter(Goal.user_id == user_id)
-    if goal_type: q = q.filter(Goal.goal_type == goal_type)
-    if period:    q = q.filter(Goal.period == period)
-    if year:      q = q.filter(Goal.year == year)
-    if month is not None: q = q.filter(Goal.month == month)
-    if category is not None: q = q.filter(Goal.category == category)
-    return q.order_by(Goal.year.desc(), Goal.month.desc().nullsfirst()).all()
+    def _match_month(self, month):
+        # SQLAlchemy에서 None 비교를 위해 is_ / == 분기
+        if month is None:
+            return Goal.month.is_(None)
+        return Goal.month == month
 
-def upsert(
-    db: Session, user_id: int, payload: GoalCreate | GoalUpdate
-) -> Goal:
-    data = payload.model_dump(exclude_unset=True)
-    key = {k: data.get(k) for k in ["goal_type", "period", "year", "month", "category"]}
-    row = get_one(db, user_id, **key) if all(k in data for k in key) else None
+    def _match_category(self, category):
+        if category is None:
+            return Goal.category.is_(None)
+        return Goal.category == category
 
-    if not row:
-        row = Goal(user_id=user_id, **key)  # 키 필수 항목 있어야 함
-        db.add(row)
+    def get_one(self, user_id: int, goal_type: str, period: str, year: int, month: int | None, category: str | None) -> Goal | None:
+        stmt = (
+            select(Goal)
+            .where(
+                Goal.user_id == user_id,
+                Goal.goal_type == goal_type,
+                Goal.period == period,
+                Goal.year == year,
+                self._match_month(month),
+                self._match_category(category),
+            )
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
 
-    # 값 반영
-    for k, v in data.items():
-        if k not in ("goal_type", "period", "year", "month", "category") or getattr(row, k, None) is None:
-            setattr(row, k, v)
+    def list_scope(self, user_id: int, goal_type: str, period: str, year: int, month: int | None) -> list[Goal]:
+        stmt = (
+            select(Goal)
+            .where(
+                Goal.user_id == user_id,
+                Goal.goal_type == goal_type,
+                Goal.period == period,
+                Goal.year == year,
+                self._match_month(month),
+            )
+            .order_by(Goal.category.is_(None), Goal.category.asc())  # None이 마지막으로 가게 조정
+        )
+        return list(self.db.execute(stmt).scalars().all())
 
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise
-    db.refresh(row)
-    return row
+    def upsert(self, user_id: int, payload: GoalCreate) -> Goal:
+        row = self.get_one(
+            user_id=user_id,
+            goal_type=payload.goal_type,
+            period=payload.period,
+            year=payload.year,
+            month=payload.month,
+            category=payload.category,
+        )
+        if row:
+            row.target_amount = payload.target_amount
+            self.db.add(row)
+        else:
+            row = Goal(
+                user_id=user_id,
+                goal_type=payload.goal_type,
+                period=payload.period,
+                year=payload.year,
+                month=payload.month,
+                category=payload.category,
+                target_amount=payload.target_amount,
+            )
+            self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
 
-def delete_one(
-    db: Session, user_id: int, goal_type: str, period: str, year: int,
-    month: Optional[int], category: Optional[str]
-) -> bool:
-    row = get_one(db, user_id, goal_type, period, year, month, category)
-    if not row: return False
-    db.delete(row)
-    db.commit()
-    return True
+    def update_amount(self, goal_id: int, payload: GoalUpdate) -> Goal | None:
+        row = self.db.get(Goal, goal_id)
+        if not row:
+            return None
+        if payload.target_amount is not None:
+            row.target_amount = payload.target_amount
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def delete_one(self, user_id: int, goal_type: str, period: str, year: int, month: int | None, category: str | None) -> bool:
+        row = self.get_one(user_id, goal_type, period, year, month, category)
+        if not row:
+            return False
+        self.db.delete(row)
+        self.db.commit()
+        return True

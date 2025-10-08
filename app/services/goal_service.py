@@ -1,14 +1,15 @@
-# app/services/goal_service.py
 from sqlalchemy.orm import Session
-from typing import Optional, List
-from app.repositories import goal_repo
+from app.repositories.goal_repo import GoalRepository
 from app.schemas.goal import GoalCreate, GoalUpdate
 
-def list_goals(db: Session, user_id: int, **filters):
-    return goal_repo.list_goals(db, user_id, **filters)
+def list_scope(db: Session, user_id: int, goal_type: str, period: str, year: int, month: int | None):
+    return GoalRepository(db).list_scope(user_id, goal_type, period, year, month)
 
-def upsert(db: Session, user_id: int, payload: GoalCreate | GoalUpdate):
-    return goal_repo.upsert(db, user_id, payload)
+def upsert_goal(db: Session, user_id: int, payload: GoalCreate):
+    return GoalRepository(db).upsert(user_id, payload)
 
-def delete(db: Session, user_id: int, **key) -> bool:
-    return goal_repo.delete_one(db, user_id, **key)
+def update_goal_amount(db: Session, goal_id: int, payload: GoalUpdate):
+    return GoalRepository(db).update_amount(goal_id, payload)
+
+def delete_goal(db: Session, user_id: int, goal_type: str, period: str, year: int, month: int | None, category: str | None) -> bool:
+    return GoalRepository(db).delete_one(user_id, goal_type, period, year, month, category)
