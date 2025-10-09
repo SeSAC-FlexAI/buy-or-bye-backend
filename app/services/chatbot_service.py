@@ -33,14 +33,6 @@ async def _get_openai_response(question: str, system_prompt: Optional[str], temp
         print(f"OpenAI API error: {e}")
         return "죄송합니다, 현재 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해주세요."
 
-def _mock_answer(question: str, system_prompt: Optional[str], temperature: Optional[float], top_p: Optional[float]) -> str:
-    # 간단한 목업: 설정값을 반영해 텍스트 생성 흉내
-    prefix = (system_prompt.strip() + "\n\n") if system_prompt else ""
-    tail = ""
-    if temperature is not None: tail += f"(temp={temperature}) "
-    if top_p is not None:       tail += f"(top_p={top_p})"
-    return f"{prefix}질문 요약: {question[:120]} ...\n\n이건 목업 응답입니다. {tail}".strip()
-
 async def ask(db: Session, current_user: Optional[User], payload: ChatbotRequestIn) -> ChatbotResponseOut:
     uid = current_user.id if current_user else None
     setting = chatbot_repo.get_setting(db, uid) if uid else None
