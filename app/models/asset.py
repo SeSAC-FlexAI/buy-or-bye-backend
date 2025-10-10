@@ -11,10 +11,10 @@ class Asset(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     date = Column(Date, nullable=False)
 
-    total_assets = Column(Integer, nullable=False)
-    real_estate = Column(Integer, default=0)
-    loans = Column(Integer, default=0)
-    deposits_cash = Column(Integer, default=0)
-    other_assets = Column(Integer, default=0)
+    total_assets = Column(Integer, nullable=False, server_default="0")
+    real_estate = Column(Integer, nullable=False, server_default="0")
+    loans = Column(Integer, nullable=False, server_default="0")
+    deposits_cash = Column(Integer, nullable=False, server_default="0")
+    other_assets = Column(Integer, nullable=False, server_default="0")
 
     user = relationship("User", back_populates="assets")

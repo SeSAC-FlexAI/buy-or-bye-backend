@@ -2,24 +2,45 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.models.asset import Asset
-from app.schemas.asset import AssetCreate, AssetUpdate
+from app.schemas.asset import AssetUpdate
+from sqlalchemy import select
 
 def get_by_user_id(db: Session, user_id: int) -> Asset | None:
     return db.query(Asset).filter(Asset.user_id == user_id).first()
 
-def upsert_for_user(db: Session, user_id: int, data: AssetCreate | AssetUpdate) -> Asset:
-    row = get_by_user_id(db, user_id)
-    if not row:
-        row = Asset(user_id=user_id)
+def _to_payload_dict(data) -> dict:
+    """
+    data가 Pydantic 모델이면 .dict(exclude_unset=True),
+    dict면 그대로, None이면 {}로 변환.
+    """
+    if data is None:
+        return {}
+    if hasattr(data, "dict"):
+        return data.dict(exclude_unset=True)
+    if isinstance(data, dict):
+        return data
+    # 그 외 타입 방어
+    return {}    
+
+def upsert_for_user(db: Session, user_id: int, data=None) -> Asset:
+    payload = _to_payload_dict(data)
+
+    row = db.execute(
+        select(Asset).where(Asset.user_id == user_id)
+    ).scalar_one_or_none()
+
+    if row:
+        for k, v in payload.items():
+            setattr(row, k, v)
         db.add(row)
-    payload = data.dict(exclude_unset=True)
-    for k, v in payload.items():
-        setattr(row, k, v)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise
+    else:
+        # 새로 만들 때 date 없으면 오늘 날짜로 보정 (또는 payload에서 받은 날짜)
+        if "date" not in payload or payload["date"] is None:
+            payload["date"] = Date.today()
+        row = Asset(user_id=user_id, **payload)
+        db.add(row)
+
+    db.commit()
     db.refresh(row)
     return row
 
