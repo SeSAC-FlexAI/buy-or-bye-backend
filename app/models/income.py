@@ -12,9 +12,12 @@ class Income(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     date = Column(Date, nullable=False)
 
-    total_income = Column(Integer, nullable=False)
-    salary = Column(Integer, default=0)
-    investment_income = Column(Integer, default=0)
-    side_income = Column(Integer, default=0)
+    # ←↓↓ 기본값과 NOT NULL을 명시 (server_default는 마이그레이션 시에만 반영됨)
+    total_income = Column(Integer, nullable=False, server_default="0")
+    salary = Column(Integer, nullable=False, server_default="0")
+    investment_income = Column(Integer, nullable=False, server_default="0")
+    side_income = Column(Integer, nullable=False, server_default="0")
+    pin_money = Column(Integer, nullable=False, server_default="0")
+    loans = Column(Integer, nullable=False, server_default="0")
 
     user = relationship("User", back_populates="incomes")  # ✅ User.incomes 와 교차 일치

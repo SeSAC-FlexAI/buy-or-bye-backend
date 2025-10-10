@@ -1,13 +1,13 @@
 # ✅ 이미 "대출"이 수입/지출 모두에 존재하면 OK, 없으면 추가
 INCOME_CATEGORIES = {
-    "월급", "용돈", "투자(부동산, 금융 등)", "기타 부수입",
-    "대출",          # ← 대출 실행(입금)으로 사용
+    "salary", "pin_money", "investment_income", "side_income",
+    "loans",          # ← 대출 실행(입금)으로 사용
 }
 
 EXPENSE_CATEGORIES = {
-    "식비", "쇼핑", "교통", "주거,관리비", "문화/여가",
-    "생활용품", "카드 대금 출금", "투자(부동산, 금융 등)", "기타",
-    "대출",          # ← 대출 원금 상환(출금)으로 사용
+    "food", "shopping", "transportation", "household_maintenance", "culture_leisure",
+    "household_goods", "card_payment_withdrawal", "investment_expense", "other",
+    "loans",          # ← 대출 원금 상환(출금)으로 사용
 }
 
-PAYMENT_METHODS = {"카드", "현금"}
+PAYMENT_METHODS = {"card", "cash"}

@@ -9,6 +9,7 @@ from app.services.account_posting_rules import calc_posting_delta, PostingDelta
 
 # 자산/수입/지출 "스냅샷" 업데이트용 레포 (프로젝트 내 실제 이름과 동일해야 합니다)
 from app.repositories import asset_repo, income_repo, expense_repo
+from datetime import date as Date
 
 
 def _io_type_from_amount(amount_signed: float) -> IoType:
@@ -16,14 +17,14 @@ def _io_type_from_amount(amount_signed: float) -> IoType:
     return "income" if amount_signed >= 0 else "expense"
 
 
-def _apply_delta(db: Session, user_id: int, d: PostingDelta) -> None:
+def _apply_delta(db: Session, user_id: int, d: PostingDelta,tx_date: Date) -> None:
     """
     룰엔진에서 계산된 델타를 자산/수입/지출 스냅샷에 반영.
     - 자산: deposits_cash / real_estate / other_assets / loans / total_assets
     - 수입 합계, 지출 합계 누적 (단건 스냅샷 기준)
     """
     # 1) 자산 스냅샷
-    asset = asset_repo.get_by_user_id(db, user_id) or asset_repo.upsert_for_user(db, user_id, data={})
+    asset = asset_repo.get_by_user_id(db, user_id) or asset_repo.upsert_for_user(db, user_id, data={"date": tx_date})
     aset_payload = {
         "deposits_cash": (getattr(asset, "deposits_cash", 0) or 0) + d.deposits_cash_delta,
         "real_estate":   (getattr(asset, "real_estate",   0) or 0) + d.real_estate_delta,
@@ -44,7 +45,7 @@ def _apply_delta(db: Session, user_id: int, d: PostingDelta) -> None:
 
     # 2) 수입/지출 합계 누적
     if d.income_delta:
-        inc = income_repo.get_by_user_id(db, user_id) or income_repo.upsert_for_user(db, user_id, data={})
+        inc = income_repo.get_by_user_id(db, user_id) or income_repo.upsert_for_user(db, user_id, data={"date": tx_date})
         income_repo.upsert_for_user(
             db, user_id,
             type("Obj", (object,), {"dict": lambda s, exclude_unset=True: {
@@ -52,7 +53,7 @@ def _apply_delta(db: Session, user_id: int, d: PostingDelta) -> None:
             }})()
         )
     if d.expense_delta:
-        exp = expense_repo.get_by_user_id(db, user_id) or expense_repo.upsert_for_user(db, user_id, data={})
+        exp = expense_repo.get_by_user_id(db, user_id) or expense_repo.upsert_for_user(db, user_id, data={"date": tx_date})
         expense_repo.upsert_for_user(
             db, user_id,
             type("Obj", (object,), {"dict": lambda s, exclude_unset=True: {
@@ -95,7 +96,10 @@ def create(db: Session, user_id: int, payload: AccountCreate) -> AccountFormOut:
         method=payload.method or "",
         amount=payload.amount
     )
-    _apply_delta(db, user_id, d)
+    
+    tx_date = payload.date
+
+    _apply_delta(db, user_id, d, tx_date)
 
     # 3) 편집폼 반환
     return AccountFormOut(
@@ -140,7 +144,10 @@ def update(db: Session, user_id: int, account_id: int, payload: AccountUpdate) -
     # 역적용(부호 반전)
     for k, v in d_prev.__dict__.items():
         setattr(d_prev, k, -v)
-    _apply_delta(db, user_id, d_prev)
+
+    tx_date = payload.date
+
+    _apply_delta(db, user_id, d_prev, tx_date)
 
     # 2) 업데이트 (부호 규칙 적용)
     amount_signed = None
@@ -164,7 +171,7 @@ def update(db: Session, user_id: int, account_id: int, payload: AccountUpdate) -
         method=row.method or "",
         amount=abs(row.amount),
     )
-    _apply_delta(db, user_id, d_new)
+    _apply_delta(db, user_id, d_new, tx_date)
 
     return get_form(db, user_id, row.id)
 
@@ -187,6 +194,8 @@ def delete(db: Session, user_id: int, account_id: int) -> bool:
     )
     for k, v in d_prev.__dict__.items():
         setattr(d_prev, k, -v)
-    _apply_delta(db, user_id, d_prev)
+
+    tx_date = date.today()    
+    _apply_delta(db, user_id, d_prev, tx_date)
 
     return account_repo.delete_by_id(db, user_id, account_id)
