@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from app.models.asset import Asset
 from app.schemas.asset import AssetUpdate
 from sqlalchemy import select
+from datetime import date as Date
 
 def get_by_user_id(db: Session, user_id: int) -> Asset | None:
     return db.query(Asset).filter(Asset.user_id == user_id).first()
@@ -22,19 +23,37 @@ def _to_payload_dict(data) -> dict:
     # 그 외 타입 방어
     return {}    
 
+# def upsert_for_user(db: Session, user_id: int, data=None) -> Asset:
+#     payload = _to_payload_dict(data)
+
+#     row = db.execute(
+#         select(Asset).where(Asset.user_id == user_id)
+#     ).scalar_one_or_none()
+
+#     if row:
+#         for k, v in payload.items():
+#             setattr(row, k, v)
+#         db.add(row)
+#     else:
+#         # 새로 만들 때 date 없으면 오늘 날짜로 보정 (또는 payload에서 받은 날짜)
+#         if "date" not in payload or payload["date"] is None:
+#             payload["date"] = Date.today()
+#         row = Asset(user_id=user_id, **payload)
+#         db.add(row)
+
+#     db.commit()
+#     db.refresh(row)
+#     return row
+
 def upsert_for_user(db: Session, user_id: int, data=None) -> Asset:
     payload = _to_payload_dict(data)
 
-    row = db.execute(
-        select(Asset).where(Asset.user_id == user_id)
-    ).scalar_one_or_none()
-
+    row = db.execute(select(Asset).where(Asset.user_id == user_id)).scalar_one_or_none()
     if row:
         for k, v in payload.items():
             setattr(row, k, v)
         db.add(row)
     else:
-        # 새로 만들 때 date 없으면 오늘 날짜로 보정 (또는 payload에서 받은 날짜)
         if "date" not in payload or payload["date"] is None:
             payload["date"] = Date.today()
         row = Asset(user_id=user_id, **payload)
@@ -43,6 +62,7 @@ def upsert_for_user(db: Session, user_id: int, data=None) -> Asset:
     db.commit()
     db.refresh(row)
     return row
+    
 
 def delete_by_user(db: Session, user_id: int) -> bool:
     row = get_by_user_id(db, user_id)
