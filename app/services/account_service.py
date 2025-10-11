@@ -17,13 +17,22 @@ def _io_type_from_amount(amount_signed: float) -> IoType:
     return "income" if amount_signed >= 0 else "expense"
 
 
-def _apply_delta(db: Session, user_id: int, d: PostingDelta,tx_date: Date) -> None:
+def _apply_delta(
+    db: Session,
+    user_id: int,
+    d: PostingDelta,
+    tx_date: Date,
+    *,
+    io_type: Optional[IoType] = None,
+    category: Optional[str] = None,
+) -> None:
     """
-    룰엔진에서 계산된 델타를 자산/수입/지출 스냅샷에 반영.
+    룰엔진 델타를 자산/수입/지출 스냅샷에 반영.
     - 자산: deposits_cash / real_estate / other_assets / loans / total_assets
-    - 수입 합계, 지출 합계 누적 (단건 스냅샷 기준)
+    - 수입/지출: '카테고리별 컬럼'을 갱신하고, 합계(total_*)는 자동 재계산
     """
-    # 1) 자산 스냅샷
+
+    # 1) 자산 스냅샷 (그대로 유지)
     asset = asset_repo.get_by_user_id(db, user_id) or asset_repo.upsert_for_user(db, user_id, data={"date": tx_date})
     aset_payload = {
         "deposits_cash": (getattr(asset, "deposits_cash", 0) or 0) + d.deposits_cash_delta,
@@ -37,29 +46,22 @@ def _apply_delta(db: Session, user_id: int, d: PostingDelta,tx_date: Date) -> No
         + aset_payload["other_assets"]
         - aset_payload["loans"]
     )
-    # upsert_for_user가 Pydantic 모델을 기대하더라도 아래 trick으로 dict 주입 가능
     asset_repo.upsert_for_user(
         db, user_id,
         type("Obj", (object,), {"dict": lambda s, exclude_unset=True: aset_payload})()
     )
 
-    # 2) 수입/지출 합계 누적
-    if d.income_delta:
-        inc = income_repo.get_by_user_id(db, user_id) or income_repo.upsert_for_user(db, user_id, data={"date": tx_date})
-        income_repo.upsert_for_user(
-            db, user_id,
-            type("Obj", (object,), {"dict": lambda s, exclude_unset=True: {
-                "total_income": (getattr(inc, "total_income", 0) or 0) + d.income_delta
-            }})()
-        )
-    if d.expense_delta:
-        exp = expense_repo.get_by_user_id(db, user_id) or expense_repo.upsert_for_user(db, user_id, data={"date": tx_date})
-        expense_repo.upsert_for_user(
-            db, user_id,
-            type("Obj", (object,), {"dict": lambda s, exclude_unset=True: {
-                "total_expense": (getattr(exp, "total_expense", 0) or 0) + d.expense_delta
-            }})()
-        )
+    # 2) 수입/지출 스냅샷 - ✅ 합계만 더하지 말고, 카테고리 컬럼을 갱신하도록 변경
+    if io_type == "income" and d.income_delta:
+        # 예: "월급" -> incomes.salary += amount  (그리고 total_income은 자동 재계산)
+        income_repo.apply_delta(db, user_id, tx_date, category or "", float(d.income_delta))
+
+    if io_type == "expense" and d.expense_delta:
+        # 예: "식비" -> expenses.food += amount  (그리고 total_expense는 자동 재계산)
+        expense_repo.apply_delta(db, user_id, tx_date, category or "", float(d.expense_delta))
+
+    # repo의 apply_delta()는 커밋하지 않으므로 여기서 한번에 커밋
+    db.commit()
 
 
 def get_form(db: Session, user_id: int, account_id: int) -> Optional[AccountFormOut]:
@@ -80,28 +82,19 @@ def get_form(db: Session, user_id: int, account_id: int) -> Optional[AccountForm
 
 
 def create(db: Session, user_id: int, payload: AccountCreate) -> AccountFormOut:
-    """
-    가계부 생성:
-    1) 레포에 저장(수입=+, 지출=- 부호 규칙 유지)
-    2) 룰 엔진 델타 계산 → 스냅샷 반영
-    3) 편집폼 형태로 반환
-    """
-    # 1) 저장
     row = account_repo.create_account(db, user_id, payload)
 
-    # 2) 델타 적용
     d = calc_posting_delta(
         io_type=payload.io_type,
         category=payload.category,
         method=payload.method or "",
-        amount=payload.amount
+        amount=payload.amount,
     )
-    
     tx_date = payload.date
 
-    _apply_delta(db, user_id, d, tx_date)
+    # ✅ io_type / category를 함께 전달
+    _apply_delta(db, user_id, d, tx_date, io_type=payload.io_type, category=payload.category)
 
-    # 3) 편집폼 반환
     return AccountFormOut(
         id=row.id,
         io_type=payload.io_type,
@@ -112,44 +105,34 @@ def create(db: Session, user_id: int, payload: AccountCreate) -> AccountFormOut:
         method=row.method,
     )
 
-
 def update(db: Session, user_id: int, account_id: int, payload: AccountUpdate) -> Optional[AccountFormOut]:
-    """
-    가계부 수정:
-    - 기존 값 델타를 역적용 → 스냅샷 되돌림
-    - 새 값 저장 → 새 델타 적용
-    """
     row = account_repo.get_by_id(db, user_id, account_id)
     if not row:
         return None
 
-    # 현재 io_type은 DB 부호로 판단
     current_io: IoType = _io_type_from_amount(row.amount)
     io_type: IoType = payload.io_type or current_io
 
-    # 카테고리 검증(선제적 가드)
     if payload.category:
         if io_type == "income" and payload.category not in INCOME_CATEGORIES:
             raise ValueError("수입 카테고리 허용값이 아닙니다.")
         if io_type == "expense" and payload.category not in EXPENSE_CATEGORIES:
             raise ValueError("지출 카테고리 허용값이 아닙니다.")
 
-    # 1) 이전 델타 역적용
+    # 1) 이전값 역적용
     d_prev = calc_posting_delta(
         io_type=current_io,
         category=row.category,
         method=row.method or "",
         amount=abs(row.amount),
     )
-    # 역적용(부호 반전)
     for k, v in d_prev.__dict__.items():
         setattr(d_prev, k, -v)
 
-    tx_date = payload.date
+    tx_date = payload.date or row.date
+    _apply_delta(db, user_id, d_prev, tx_date, io_type=current_io, category=row.category)
 
-    _apply_delta(db, user_id, d_prev, tx_date)
-
-    # 2) 업데이트 (부호 규칙 적용)
+    # 2) DB 업데이트 (부호 규칙 적용)
     amount_signed = None
     if payload.amount is not None:
         amount_signed = payload.amount if io_type == "income" else -payload.amount
@@ -164,38 +147,45 @@ def update(db: Session, user_id: int, account_id: int, payload: AccountUpdate) -
         method=payload.method,
     )
 
-    # 3) 신규 델타 적용
+    # 3) 신규값 적용
     d_new = calc_posting_delta(
         io_type=io_type,
         category=row.category,
         method=row.method or "",
         amount=abs(row.amount),
     )
-    _apply_delta(db, user_id, d_new, tx_date)
+    _apply_delta(db, user_id, d_new, row.date, io_type=io_type, category=row.category)
 
     return get_form(db, user_id, row.id)
+    
+
+def _negate_delta(d):
+    d.income_delta *= -1
+    d.expense_delta *= -1
+    d.deposits_cash_delta *= -1
+    d.other_assets_delta *= -1
+    d.real_estate_delta *=-1
+    d.loans_delta *=-1
+    return d
 
 
 def delete(db: Session, user_id: int, account_id: int) -> bool:
-    """
-    가계부 삭제:
-    - 삭제 전, 기존 값 델타를 역적용하여 스냅샷 되돌림
-    """
     row = account_repo.get_by_id(db, user_id, account_id)
-    if not row:
+    if not row or row.user_id != user_id:
         return False
 
-    prev_io: IoType = _io_type_from_amount(row.amount)
-    d_prev = calc_posting_delta(
-        io_type=prev_io,
-        category=row.category,
-        method=row.method or "",
-        amount=abs(row.amount),
-    )
-    for k, v in d_prev.__dict__.items():
-        setattr(d_prev, k, -v)
+    # DB에는 amount가 수입은 +, 지출은 - 로 저장되어 있다고 가정
+    io_type = "income" if row.amount > 0 else "expense"
+    amt = abs(row.amount)
+    category = row.category
+    method = row.method
+    tx_date = row.date
 
-    tx_date = date.today()    
-    _apply_delta(db, user_id, d_prev, tx_date)
+    # 생성 시 계산했던 것과 동일한 델타 계산 후 '역적용'
+    d = calc_posting_delta(io_type=io_type, category=category, amount=amt, method=method)
+    d.category = category  # (bump_by_category에서 카테고리 참고)
 
+    _apply_delta(db, user_id, _negate_delta(d), tx_date, io_type=io_type, category=category)
+
+    # 마지막에 거래 삭제
     return account_repo.delete_by_id(db, user_id, account_id)
