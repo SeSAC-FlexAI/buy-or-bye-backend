@@ -100,3 +100,4 @@ def delete_by_user(db: Session, user_id: int) -> bool:
     db.delete(row)
     db.commit()
     return True
+

@@ -20,12 +20,16 @@ def calc_posting_delta(*, io_type: str, category: str, method: str | None, amoun
         d.deposits_cash_delta -= amt
         return d
 
-    # 2) 투자(부동산/금융 등): io_type으로 매수/매도 해석 (세부 파생 제외)
-    if category == "투자수익":
-        if io_type == "expense":   # 매수
+    # 투자: 지출이면 투자매수(현금→투자자산), 수입이면 투자매도(투자자산→현금)
+    if category == "투자":
+        if io_type == "expense":
+            # 지출로 잡히면서, 현금 줄고 투자자산 늘어남
+            d.expense_delta += amt
             d.deposits_cash_delta -= amt
             d.other_assets_delta  += amt
-        else:                      # income = 매도
+        else:
+            # 수입으로 잡히면서, 투자자산 줄고 현금 늘어남
+            d.income_delta  += amt
             d.deposits_cash_delta += amt
             d.other_assets_delta  -= amt
         return d
@@ -47,6 +51,7 @@ def calc_posting_delta(*, io_type: str, category: str, method: str | None, amoun
         if io_type == "income":
             d.deposits_cash_delta +=amt
             d.income_delta +=amt
+            return d
     
 
     # etc) 일반 수입/지출
