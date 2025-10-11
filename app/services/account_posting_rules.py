@@ -16,12 +16,12 @@ def calc_posting_delta(*, io_type: str, category: str, method: str | None, amoun
     mtd = (method or "").upper()
 
     # 1) 카드대금 출금: 자산만 감소 (지출합계 X)
-    if category == "카드 대금 출금":
+    if category == "카드대금출금":
         d.deposits_cash_delta -= amt
         return d
 
     # 2) 투자(부동산/금융 등): io_type으로 매수/매도 해석 (세부 파생 제외)
-    if category == "투자(부동산, 금융 등)":
+    if category == "투자수익":
         if io_type == "expense":   # 매수
             d.deposits_cash_delta -= amt
             d.other_assets_delta  += amt
@@ -42,7 +42,14 @@ def calc_posting_delta(*, io_type: str, category: str, method: str | None, amoun
             d.expense_delta       += amt    # ✅ 지출 합계에 포함
         return d
 
-    # 4) 일반 수입/지출
+    # I1) 월급
+    if category == "월급":
+        if io_type == "income":
+            d.deposits_cash_delta +=amt
+            d.income_delta +=amt
+    
+
+    # etc) 일반 수입/지출
     if io_type == "income":
         d.income_delta       += amt
         d.deposits_cash_delta += amt
@@ -50,7 +57,7 @@ def calc_posting_delta(*, io_type: str, category: str, method: str | None, amoun
 
     if io_type == "expense":
         d.expense_delta      += amt
-        if mtd != "카드":                 # 카드 지출은 자산 즉시 감소 없음
+        if mtd != "card":                 # 카드 지출은 자산 즉시 감소 없음
             d.deposits_cash_delta -= amt
         return d
 

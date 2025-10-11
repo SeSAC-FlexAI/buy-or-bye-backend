@@ -4,6 +4,34 @@ from sqlalchemy.exc import IntegrityError
 from app.models.expense import Expense
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate
 from sqlalchemy import select
+from datetime import date as Date
+
+CATEGORY_TO_FIELD = {
+    "식비": "food",
+    "쇼핑": "shopping",
+    "교통/차량": "transportation",
+    "집/관리비": "household_maintenance",
+    "문화/여가": "culture_leisure",
+    "생활용품": "household_goods",  # (구 cosmetic → household_goods 로 바꿨다고 하셨음)
+    "카드대금": "card_payment_withdrawal",
+    "투자수익": "investment_expense",
+    "기타": "other",
+    "대출": "loans",     
+    
+}
+
+EXCLUDE_FROM_SUM = {"id", "user_id", "date", "total_expense"}
+
+def _recompute_total_expense(row: Expense) -> None:
+    total = 0.0
+    for col in row.__table__.columns:
+        name = col.name
+        if name in EXCLUDE_FROM_SUM:
+            continue
+        val = getattr(row, name) or 0.0
+        total += float(val)
+    row.total_expense = total
+
 
 def _to_payload_dict(data) -> dict:
     if data is None:
@@ -52,6 +80,23 @@ def upsert_for_user(db: Session, user_id: int, data=None) -> Expense:
 
     db.commit()
     db.refresh(row)
+    return row
+
+def apply_delta(db: Session, user_id: int, tx_date: Date, category: str, amount: float) -> Expense:
+    """
+    - 해당 user의 Expense 행 upsert
+    - category 컬럼만 증감
+    - total_expense는 자동 합계
+    """
+    row = upsert_for_user(db, user_id, {"date": tx_date})
+    field = CATEGORY_TO_FIELD.get(category)
+    if field is None:
+        field = "etc"
+
+    current = getattr(row, field) or 0.0
+    setattr(row, field, float(current) + float(amount))
+
+    _recompute_total_expense(row)
     return row
 
 def delete_by_user(db: Session, user_id: int) -> bool:

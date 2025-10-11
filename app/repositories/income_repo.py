@@ -4,6 +4,27 @@ from sqlalchemy.exc import IntegrityError
 from app.models.income import Income
 from app.schemas.income import IncomeCreate, IncomeUpdate
 from sqlalchemy import select
+from datetime import date as Date
+
+CATEGORY_TO_FIELD = {
+    "월급": "salary",
+    "투자수익": "investment_income",
+    "부가수익": "side_income",
+    "용돈": "pin_money",
+    "대출": "loans",  # 유입(대출금 유입)을 수입에 적는 정책이라면 유지, 아니면 제거
+}
+
+EXCLUDE_FROM_SUM = {"id", "user_id", "date", "total_income"}
+
+def _recompute_total_income(row: Income) -> None:
+    total = 0.0
+    for col in row.__table__.columns:
+        name = col.name
+        if name in EXCLUDE_FROM_SUM:
+            continue
+        val = getattr(row, name) or 0.0
+        total += float(val)
+    row.total_income = total
 
 def _to_payload_dict(data) -> dict:
     """
@@ -51,6 +72,25 @@ def upsert_for_user(db: Session, user_id: int, data=None) -> Income:
     db.add(row)
     db.commit()
     db.refresh(row)
+    return row
+
+def apply_delta(db: Session, user_id: int, tx_date: Date, category: str, amount: float) -> Income:
+    """
+    - 해당 user의 Income 행을 upsert
+    - category에 해당하는 세부 컬럼만 증감
+    - total_income은 모든 세부항목 합으로 ‘자동 재계산’
+    """
+    row = upsert_for_user(db, user_id, {"date": tx_date})
+    field = CATEGORY_TO_FIELD.get(category)
+    if field is None:
+        # 정의되지 않은 카테고리는 '부업/기타'로 몰아넣는 정책 (원하면 에러로 바꿔도 됨)
+        field = "side_income"
+
+    current = getattr(row, field) or 0.0
+    setattr(row, field, float(current) + float(amount))
+
+    _recompute_total_income(row)
+    # 여기서는 commit 안 함 (service에서 트랜잭션 제어)
     return row
 
 def delete_by_user(db: Session, user_id: int) -> bool:

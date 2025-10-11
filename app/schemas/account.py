@@ -20,7 +20,7 @@ class AccountCreate(BaseModel):
     )
     category: str = Field(
         ...,
-        description="카테고리 (수입: 월급/이자/기타 등, 지출: 식비/교통/주거 등)"
+        description="카테고리 (수입: salary, pin_money, investment_income, side_income, loans) ( 지출: food, shopping, transportation, household_maintenance, culture_leisure,household_goods, card_payment_withdrawal, investment_expense, other,loans)"
     )
     date: Date = Field(
         ...,
@@ -32,7 +32,7 @@ class AccountCreate(BaseModel):
     )
     method: Optional[str] = Field(
         None,
-        description="결제수단 (예: '카드', '현금')"
+        description="결제수단 (예: 'card', 'cash')"
     )
 
     # ✅ Swagger Request body 기본 예시
@@ -41,10 +41,10 @@ class AccountCreate(BaseModel):
             "example": {
                 "io_type": "income",
                 "amount": 1500000,
-                "category": "월급",
+                "category": "salary",
                 "date": "2025-10-02",
                 "description": "10월 급여",
-                "method": "현금"
+                "method": "cash"
             }
         }
     )
