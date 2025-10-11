@@ -13,11 +13,6 @@
 #     "대출": "loans",  # 유입(대출금 유입)을 수입에 적는 정책이라면 유지, 아니면 제거
 # }
 
-INCOME_CATEGORIES = {
-    "월급", "용돈", "투자", "부가수익",
-    "대출",          # ← 대출 실행(입금)으로 사용
-}
-
 # EXPENSE_CATEGORIES = {
 #     "food", "shopping", "transportation", "household_maintenance", "culture_leisure",
 #     "household_goods", "card_payment_withdrawal", "investment_expense", "other",
@@ -38,9 +33,14 @@ INCOME_CATEGORIES = {
 #     "대출": "loans",     
 # }
 
+INCOME_CATEGORIES = {
+    "월급", "용돈", "투자", "부가수익",
+    "대출",          # ← 대출 실행(입금)으로 사용
+}
+
 EXPENSE_CATEGORIES = {
     "식비", "쇼핑", "교통/차량", "집/관리비", "문화/여가",
-    "생활용품", "카드대금", "투자수익", "기타",
+    "생활용품", "카드대금", "투자", "기타",
     "대출",          # ← 대출 원금 상환(출금)으로 사용
 }
 
