@@ -13,30 +13,46 @@ client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 pc = Pinecone(api_key=settings.PINECONE_API_KEY)
 index = pc.Index(settings.PINECONE_INDEX_NAME)  # 설정에서 인덱스명 가져오기
 
-async def _search_pinecone(question: str, top_k: int = 5) -> str:
-    """Pinecone에서 관련 정책 정보를 검색"""
+async def get_openai_embedding(text: str) -> list:
+    """OpenAI text-embedding-3-small 모델로 텍스트 임베딩"""
     try:
-        # Pinecone에서 텍스트로 검색 (integrated embedding 사용)
-        results = index.search(
-            namespace="policy",  # 정책 관련 네임스페이스
-            query={
-                "inputs": {"text": question},
-                "top_k": top_k
-            },
-            fields=["text", "title", "category"]  # 반환할 필드
+        response = await client.embeddings.create(
+            input=[text],
+            model="text-embedding-3-small"
         )
-        
-        # 검색 결과를 컨텍스트로 조합
+        return response.data[0].embedding
+    except Exception as e:
+        print(f"OpenAI embedding error: {e}")
+        return []
+
+
+async def _search_pinecone(question: str, top_k: int = 5) -> str:
+    """Pinecone에서 관련 정책 정보를 검색 (OpenAI 임베딩 사용)"""
+    try:
+        # 1. 질문을 OpenAI 임베딩으로 변환
+        query_vector = await get_openai_embedding(question)
+        if not query_vector:
+            return "임베딩 생성에 실패했습니다."
+
+        # 2. Pinecone에서 벡터 검색
+        results = index.query(
+            namespace="policy",
+            vector=query_vector,
+            top_k=top_k,
+            include_metadata=True
+        )
+
+        # 3. 결과에서 컨텍스트 조합
         context_parts = []
-        for hit in results.get('result', {}).get('hits', []):
-            fields = hit.get('fields', {})
-            title = fields.get('title', '')
-            text = fields.get('text', '')
+        for match in results.get('matches', []):
+            meta = match.get('metadata', {})
+            title = meta.get('title', '')
+            text = meta.get('text', '')
             if title and text:
                 context_parts.append(f"제목: {title}\n내용: {text}")
-        
+
         return "\n\n".join(context_parts) if context_parts else "관련 정책 정보를 찾을 수 없습니다."
-        
+
     except Exception as e:
         print(f"Pinecone search error: {e}")
         return "정책 정보 검색 중 오류가 발생했습니다."
