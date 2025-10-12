@@ -26,7 +26,7 @@ async def get_openai_embedding(text: str) -> list:
         return []
 
 
-async def _search_pinecone(question: str, top_k: int = 5) -> str:
+async def _search_pinecone(question: str, top_k: int = 50) -> str:
     try:
         query_vector = await get_openai_embedding(question)
         if not query_vector:
