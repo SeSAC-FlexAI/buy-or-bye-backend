@@ -7,7 +7,7 @@ from app.schemas.goal import GoalCreate, GoalUpdate, GoalOut
 from app.services import goal_service
 from app.models.user import User
 
-router = APIRouter(prefix="/api/goal", tags=["goal"])
+router = APIRouter( tags=["goal"])
 
 GoalType = Literal["ASSET", "INCOME", "EXPENSE"]
 Period = Literal["MONTHLY", "YEARLY"]
