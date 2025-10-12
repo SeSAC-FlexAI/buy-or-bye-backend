@@ -26,32 +26,46 @@ async def get_openai_embedding(text: str) -> list:
         return []
 
 
-async def _search_pinecone(question: str, top_k: int = 50) -> str:
+async def _search_pinecone(question: str, top_k: int = 5) -> str:
     try:
         query_vector = await get_openai_embedding(question)
         if not query_vector:
             return "임베딩 생성에 실패했습니다."
 
         results = index.query(
-            namespace="policy",
+            namespace="__default__",  # policy → __default__로 변경
             vector=query_vector,
             top_k=top_k,
             include_metadata=True
         )
 
         context_parts = []
-        matches = getattr(results, "matches", None) or results.get("matches", [])
+        
+        if isinstance(results, dict):
+            matches = results.get("matches", [])
+        else:
+            matches = getattr(results, "matches", [])
+        
         for match in matches:
-            meta = match.metadata if hasattr(match, "metadata") else match.get("metadata", {})
-            title = meta.get('title', '')
-            text = meta.get('text', '')
+            if isinstance(match, dict):
+                meta = match.get("metadata", {})
+            else:
+                meta = getattr(match, "metadata", {})
+            
+            title = meta.get('title', '') if isinstance(meta, dict) else getattr(meta, 'title', '')
+            text = meta.get('text', '') if isinstance(meta, dict) else getattr(meta, 'text', '')
+            
             if title and text:
                 context_parts.append(f"제목: {title}\n내용: {text}")
+            elif text:
+                context_parts.append(f"내용: {text}")
 
         return "\n\n".join(context_parts) if context_parts else "관련 정책 정보를 찾을 수 없습니다."
 
     except Exception as e:
-        print(f"Pinecone search error: {e}")
+        print(f"❌ Pinecone search error: {e}")
+        import traceback
+        print(traceback.format_exc())
         return "정책 정보 검색 중 오류가 발생했습니다."
 
 async def _get_openai_response(question: str, system_prompt: Optional[str], temperature: Optional[float], top_p: Optional[float]) -> str:
@@ -103,10 +117,20 @@ async def ask(db: Session, current_user: Optional[User], payload: ChatbotRequest
 async def _get_response_with_context(question: str, system_prompt: Optional[str], temperature: Optional[float], top_p: Optional[float]) -> str:
     """질문에 '정책' 키워드가 포함되면 Pinecone 검색, 아니면 일반 OpenAI 응답"""
     
-    # '정책' 키워드 검사 (대소문자 무관)
-    if '정책' in question.lower():
+    # 디버깅 로그 추가
+    print(f"🔍 질문: {question}")
+    print(f"🔍 '정책' 키워드 포함 여부: {'정책' in question}")
+    
+    # '정책' 키워드 검사
+    if '정책' in question:
+        print("✅ 정책 키워드 감지 - Pinecone 검색 시작")
+        
         # Pinecone에서 관련 정책 정보 검색
         policy_context = await _search_pinecone(question)
+        
+        # 검색 결과 로그
+        print(f"📋 Pinecone 검색 결과 길이: {len(policy_context)}")
+        print(f"📋 검색 결과 일부: {policy_context[:200]}...")
         
         # 정책 정보를 포함한 시스템 프롬프트 생성
         policy_system_prompt = f"""
