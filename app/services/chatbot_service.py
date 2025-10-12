@@ -27,14 +27,11 @@ async def get_openai_embedding(text: str) -> list:
 
 
 async def _search_pinecone(question: str, top_k: int = 5) -> str:
-    """Pinecone에서 관련 정책 정보를 검색 (OpenAI 임베딩 사용)"""
     try:
-        # 1. 질문을 OpenAI 임베딩으로 변환
         query_vector = await get_openai_embedding(question)
         if not query_vector:
             return "임베딩 생성에 실패했습니다."
 
-        # 2. Pinecone에서 벡터 검색
         results = index.query(
             namespace="policy",
             vector=query_vector,
@@ -42,10 +39,10 @@ async def _search_pinecone(question: str, top_k: int = 5) -> str:
             include_metadata=True
         )
 
-        # 3. 결과에서 컨텍스트 조합
         context_parts = []
-        for match in results.get('matches', []):
-            meta = match.get('metadata', {})
+        matches = getattr(results, "matches", None) or results.get("matches", [])
+        for match in matches:
+            meta = match.metadata if hasattr(match, "metadata") else match.get("metadata", {})
             title = meta.get('title', '')
             text = meta.get('text', '')
             if title and text:
