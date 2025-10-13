@@ -5,7 +5,7 @@ from app.api.deps import get_db, get_current_user_optional, get_current_user
 from app.schemas.fpti import FptiCreate, FptiOut
 from app.services import fpti_service
 
-router = APIRouter(prefix="/api/fpti", tags=["fpti"])
+router = APIRouter( tags=["fpti"])
 
 @router.post("/posts", response_model=FptiOut, response_model_exclude={"result"})
 def create_fpti(payload: FptiCreate,
